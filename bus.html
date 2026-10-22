@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B3A · Fu Tai Estate → Shenzhen Bay Port</title>
+<style>
+  :root {
+    --bg: #0e1420;
+    --card: #17202f;
+    --card2: #1d2839;
+    --text: #eaf0f8;
+    --muted: #8b99ad;
+    --accent: #38bdf8;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --border: #2a3548;
+
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, "PingFang HK", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #0b111b 0%, #101a2b 60%, #0d1626 100%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  header { margin-bottom: 18px; }
+  .route-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    font-weight: 700; font-size: 22px; letter-spacing: .5px;
+    padding: 8px 18px; border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(37,99,235,.35);
+  }
+  h1 { font-size: 20px; margin: 14px 0 4px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid #26344a;
+    border-radius: 12px; padding: 10px 14px; margin: 16px 0;
+    font-size: 13px; color: var(--muted);
+  }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--green); margin-right:6px; }
+  .dot.loading { background: var(--amber); animation: pulse 1s infinite alternate; }
+  .dot.error { background: var(--red); animation: none; }
+  @keyframes pulse { from { opacity: .35 } to { opacity: 1 } }
+  .cards { display: flex; flex-direction: column; gap: 12px; }
+  .bus {
+    background: var(--card);
+    border: 1px solid #26344a;
+    border-left: 5px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    animation: rise .35s ease both;
+  }
+  .bus:nth-child(2) { border-left-color: var(--green); }
+  .bus:nth-child(3) { border-left-color: #a78bfa; }
+  @keyframes rise { from { opacity:0; transform: translateY(8px) } to { opacity:1; transform:none } }
+  .bus .info .eta-seq { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .bus .info .dest { font-size: 16px; font-weight: 600; margin-top: 3px; }
+  .bus .info .arrive { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .minutes { text-align: right; white-space: nowrap; }
+  .minutes .num { font-size: 40px; font-weight: 700; line-height: 1; }
+  .minutes .unit { font-size: 13px; color: var(--muted); letter-spacing: .06em; }
+  .minutes.soon .num { color: var(--amber); }
+  .minutes.now .num { color: var(--red); }
+  .empty {
+    background: var(--card); border: 1px dashed #33445f;
+    border-radius: 14px; padding: 34px 20px; text-align: center; color: var(--muted);
+  }
+  .empty strong { color: var(--text); display:block; font-size:16px; margin-bottom:6px; }
+  footer { margin-top: 22px; font-size: 12px; color: #63718a; line-height: 1.7; }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="route-badge">B3A <span style="font-weight:400;font-size:15px">Citybus 城巴</span></div>
+    <h1>Fu Tai Estate 富泰邨 → Shenzhen Bay Port 深圳灣口岸</h1>
+    <div class="sub">Next buses, in minutes · Outbound ( towards Shenzhen Bay Port )</div>
+  </header>
+
+  <div class="statusbar">
+    <span id="status"><span class="dot loading"></span>Fetching…</span>
+    <span id="countdown">refreshing in 30 s</span>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <footer>
+    Data: <a href="https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/003261/B3A" target="_blank" rel="noopener">Citybus ETA API</a>
+    (DATA.GOV.HK open data) · stop <b>003261</b> 富泰邨, 青山公路 ·
+    Auto-refresh every 30 seconds · Times shown relative to your device clock (Asia/Hong_Kong).
+  </footer>
+</div>
+
+<script>
+const API = "https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/003261/B3A";
+const REFRESH_MS = 30000;
+const cards = document.getElementById("cards");
+const statusEl = document.getElementById("status");
+const countdownEl = document.getElementById("countdown");
+
+let nextFetchAt = Date.now() + REFRESH_MS;
+let latestEtas = [];
+
+function fmtTime(d) {
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+
+function minutesUntil(iso) {
+  const t = Date.parse(iso);
+  if (isNaN(t)) return null;
+  return (t - Date.now()) / 60000;
+}
+
+let renderedSignature = "";
+
+// Builds the card DOM once per data change; the per-second countdown only
+// mutates text nodes so cards don't re-animate every second.
+function render() {
+  const signature = latestEtas.map(e => e.eta + "|" + e.eta_seq + "|" + e.dest_en).join("~");
+  if (signature === renderedSignature && cards.children.length) {
+    updateCountdowns();
+    return;
+  }
+  renderedSignature = signature;
+  cards.innerHTML = "";
+
+  if (latestEtas.length === 0) {
+    cards.innerHTML = '<div class="empty"><strong>No upcoming B3A departures</strong>' +
+      'The service may be finished for the day, or no real-time ETA is available right now.</div>';
+    return;
+  }
+
+  latestEtas.forEach((e, i) => {
+    const el = document.createElement("div");
+    el.className = "bus";
+    const arrive = e.eta ? "Arriving " + fmtTime(new Date(Date.parse(e.eta))) : "";
+    const rmk = (e.rmk_en || e.rmk_tc) ? '<div class="arrive">' + escapeHtml(e.rmk_en || e.rmk_tc) + '</div>' : "";
+    el.dataset.eta = e.eta;
+    el.innerHTML =
+      '<div class="info">' +
+        '<div class="eta-seq">' + (i === 0 ? "Next bus" : "Bus " + (i + 1)) + '</div>' +
+        '<div class="dest">→ ' + escapeHtml(e.dest_en) + ' ' + escapeHtml(e.dest_tc || "") + '</div>' +
+        '<div class="arrive">' + arrive + '</div>' + rmk +
+      '</div>' +
+      '<div class="minutes">' +
+        '<div class="num">–</div>' +
+        '<div class="unit">MIN</div>' +
+      '</div>';
+    cards.appendChild(el);
+  });
+  updateCountdowns();
+}
+
+function updateCountdowns() {
+  cards.querySelectorAll(".bus").forEach(el => {
+    const mins = minutesUntil(el.dataset.eta);
+    if (mins === null) return;
+    const rounded = Math.max(0, Math.round(mins));
+    const box = el.querySelector(".minutes");
+    box.classList.toggle("now", mins <= 0.5);
+    box.classList.toggle("soon", mins > 0.5 && mins <= 3);
+    el.querySelector(".num").textContent = rounded;
+    el.querySelector(".unit").textContent = "MIN" + (rounded === 1 ? "" : "S");
+  });
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+function setStatus(kind, text) {
+  statusEl.innerHTML = '<span class="dot ' + kind + '"></span>' + text;
+}
+
+async function fetchEtas() {
+  setStatus("loading", "Fetching live ETA…");
+  try {
+    const res = await fetch(API, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    const now = Date.now();
+    // keep future ETAs only, sorted soonest first, one row per eta_seq
+    latestEtas = (json.data || [])
+      .filter(e => e.eta && Date.parse(e.eta) > now - 30000 && e.dir === "O")
+      .sort((a, b) => Date.parse(a.eta) - Date.parse(b.eta))
+      .slice(0, 5);
+    render();
+    const stamp = json.generated_timestamp ? new Date(Date.parse(json.generated_timestamp)) : new Date();
+    setStatus("", "Live · updated " + fmtTime(stamp));
+    nextFetchAt = Date.now() + REFRESH_MS;
+  } catch (err) {
+    setStatus("error", "Update failed (" + err.message + ") · retrying");
+    nextFetchAt = Date.now() + REFRESH_MS;
+  }
+}
+
+function tick() {
+  const left = Math.max(0, Math.ceil((nextFetchAt - Date.now()) / 1000));
+  countdownEl.textContent = "refreshing in " + left + " s";
+  if (left <= 0) fetchEtas();
+  render(); // keep the "minutes" counters live
+}
+
+fetchEtas();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

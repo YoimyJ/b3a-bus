@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B3A · Fu Tai Estate → Shenzhen Bay | 富泰邨 往 深圳灣口岸</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);min-height:100vh;color:#e0e0e0}
+        .container{max-width:800px;margin:0 auto;padding:20px}
+        header{text-align:center;padding:30px 0 15px}
+        .route-badge{display:inline-block;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;font-size:2.5rem;font-weight:800;padding:10px 30px;border-radius:12px;letter-spacing:2px;box-shadow:0 4px 15px rgba(231,76,60,.4);margin-bottom:12px}
+        .route-title{font-size:1.2rem;color:#b0b0b0;margin-bottom:4px}
+        .route-subtitle{font-size:.9rem;color:#777}
+        .direction-toggle{display:flex;justify-content:center;gap:0;margin:22px 0;background:rgba(255,255,255,.05);border-radius:12px;padding:4px}
+        .direction-btn{flex:1;max-width:300px;padding:12px 20px;border:none;border-radius:9px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .3s ease;background:transparent;color:#999}
+        .direction-btn.active{background:linear-gradient(135deg,#3498db,#2980b9);color:#fff;box-shadow:0 2px 10px rgba(52,152,219,.4)}
+        .direction-btn:hover:not(.active){color:#ccc;background:rgba(255,255,255,.05)}
+        .info-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 5px}
+        .last-updated{font-size:.82rem;color:#777}
+        .refresh-status{font-size:.82rem;color:#27ae60;display:flex;align-items:center;gap:6px}
+        .refresh-dot{width:8px;height:8px;background:#27ae60;border-radius:50%;animation:pulse 2s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .stops-list{display:flex;flex-direction:column;gap:0}
+        .stop-card{display:flex;align-items:center;padding:14px 18px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);transition:background .2s}
+        .stop-card:hover{background:rgba(255,255,255,.08)}
+        .stop-card:first-child{border-radius:12px 12px 0 0}
+        .stop-card:last-child{border-radius:0 0 12px 12px;border-bottom:none}
+        .stop-card.terminus{background:rgba(52,152,219,.08)}
+        .stop-card.terminus .stop-name{color:#3498db;font-weight:700}
+        .stop-card.futai{background:rgba(46,204,113,.08)}
+        .stop-card.futai .stop-number{background:#27ae60;color:#fff}
+        .stop-card.futai .stop-name{color:#2ecc71}
+        .stop-number{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;color:#aaa;flex-shrink:0;margin-right:14px}
+        .stop-card.terminus .stop-number{background:#3498db;color:#fff}
+        .stop-info{flex:1;min-width:0}
+        .stop-name{font-size:1rem;font-weight:600;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .stop-name-en{font-size:.78rem;color:#777;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .eta-info{text-align:right;flex-shrink:0;margin-left:14px}
+        .eta-time{font-size:1.2rem;font-weight:700;color:#2ecc71}
+        .eta-time.arriving{color:#e74c3c;animation:pulse 1s infinite}
+        .eta-time.departed{color:#666}
+        .eta-label{font-size:.72rem;color:#666;margin-top:2px}
+        .eta-remark{font-size:.72rem;color:#e67e22;margin-top:2px}
+        .loading{text-align:center;padding:60px 20px;color:#666}
+        .loading-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.1);border-top-color:#3498db;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 15px}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .error-message{text-align:center;padding:40px 20px;background:rgba(231,76,60,.1);border-radius:12px;color:#e74c3c;margin:20px 0}
+        .error-message h3{margin-bottom:10px}
+        .error-message p{color:#999;font-size:.9rem}
+        footer{text-align:center;padding:30px 0 20px;color:#555;font-size:.78rem}
+        footer a{color:#3498db;text-decoration:none}
+        .progress-bar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,#3498db,#2ecc71);z-index:1000;transition:width .3s ease;border-radius:0 2px 2px 0}
+        .segment-badge{display:inline-block;background:rgba(46,204,113,.15);color:#2ecc71;font-size:.75rem;font-weight:600;padding:4px 12px;border-radius:20px;margin-top:8px;border:1px solid rgba(46,204,113,.3)}
+        @media(max-width:600px){.container{padding:15px}.route-badge{font-size:2rem;padding:8px 20px}.stop-card{padding:12px 15px}.stop-number{width:28px;height:28px;font-size:.72rem;margin-right:10px}.eta-time{font-size:1.05rem}.stop-name{font-size:.92rem}}
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="container">
+        <header>
+            <div class="route-badge">B3A</div>
+            <div class="route-title">Fu Tai Estate → Shenzhen Bay Port</div>
+            <div class="route-subtitle">富泰邨 往 深圳灣口岸 · Cross-Harbour Bus</div>
+            <span class="segment-badge">Fu Tai Segment</span>
+        </header>
+
+        <div class="direction-toggle">
+            <button class="direction-btn active" id="btnOutbound" onclick="setDirection('O')">
+                🚌 To Shenzhen Bay 往深圳灣
+            </button>
+            <button class="direction-btn" id="btnInbound" onclick="setDirection('I')">
+                🚌 To Fu Tai 往富泰邨
+            </button>
+        </div>
+
+        <div class="info-bar">
+            <span class="last-updated" id="lastUpdated">Loading data...</span>
+            <span class="refresh-status">
+                <span class="refresh-dot"></span>
+                Live
+            </span>
+        </div>
+
+        <div id="content">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading bus data...</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>Data provided by <a href="https://data.gov.hk/en-data/dataset/ctb-eta-transport-realtime-eta" target="_blank">Citybus Open Data</a> via DATA.GOV.HK</p>
+            <p style="margin-top:5px;">ETA data refreshes every 30 seconds</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const ROUTE = 'B3A';
+        const COMPANY = 'ctb';
+        const REFRESH_INTERVAL = 30000;
+
+        // Fu Tai Estate stop IDs
+        const FUTAI_STOP_OUTBOUND = '003261'; // Outbound: Fu Tai Estate
+        const FUTAI_STOP_INBOUND = '003262';  // Inbound: Fu Tai Shopping Centre
+
+        let currentDirection = 'O';
+        let refreshTimer = null;
+        let stopNames = {};
+
+        async function fetchRouteInfo() {
+            const res = await fetch(`${API_BASE}/route/${COMPANY}/${ROUTE}`);
+            const data = await res.json();
+            return data.data;
+        }
+
+        async function fetchStops(direction) {
+            const res = await fetch(`${API_BASE}/route-stop/${COMPANY}/${ROUTE}/${direction}`);
+            const data = await res.json();
+            return data.data;
+        }
+
+        async function fetchStopName(stopId) {
+            if (stopNames[stopId]) return stopNames[stopId];
+            const res = await fetch(`${API_BASE}/stop/${stopId}`);
+            const data = await res.json();
+            stopNames[stopId] = data.data;
+            return data.data;
+        }
+
+        async function fetchETA(stopId) {
+            const res = await fetch(`${API_BASE}/eta/${COMPANY}/${stopId}/${ROUTE}`);
+            const data = await res.json();
+            if (data.data) {
+                return data.data.filter(eta => eta.dir === currentDirection);
+            }
+            return [];
+        }
+
+        function formatETA(etaTime) {
+            if (!etaTime) return null;
+            const now = new Date();
+            const eta = new Date(etaTime);
+            const diffMs = eta - now;
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 0) return { text: 'Departed', class: 'departed', departed: true };
+            if (diffMin === 0) return { text: 'Arriving', class: 'arriving', arriving: true };
+            if (diffMin === 1) return { text: '1 min', class: '' };
+            return { text: `${diffMin} mins`, class: '' };
+        }
+
+        function formatTime(etaTime) {
+            if (!etaTime) return '';
+            const eta = new Date(etaTime);
+            return eta.toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        function isFuTaiStop(stopId) {
+            if (currentDirection === 'O') return stopId === FUTAI_STOP_OUTBOUND;
+            return stopId === FUTAI_STOP_INBOUND;
+        }
+
+        async function loadData() {
+            const content = document.getElementById('content');
+            const progressBar = document.getElementById('progressBar');
+
+            try {
+                progressBar.style.width = '30%';
+
+                const routeInfo = await fetchRouteInfo();
+
+                progressBar.style.width = '50%';
+
+                const stops = await fetchStops(currentDirection);
+
+                progressBar.style.width = '70%';
+
+                const stopDetails = await Promise.all(
+                    stops.map(async (stop) => {
+                        const [nameData, etaData] = await Promise.all([
+                            fetchStopName(stop.stop),
+                            fetchETA(stop.stop)
+                        ]);
+                        return { ...stop, name: nameData, etas: etaData };
+                    })
+                );
+
+                progressBar.style.width = '90%';
+
+                renderStops(stopDetails);
+
+                const now = new Date();
+                document.getElementById('lastUpdated').textContent =
+                    `Last updated: ${now.toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`;
+
+                progressBar.style.width = '100%';
+                setTimeout(() => { progressBar.style.width = '0%'; }, 500);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                content.innerHTML = `
+                    <div class="error-message">
+                        <h3>Unable to load bus data</h3>
+                        <p>Please check your internet connection and try again.</p>
+                        <p style="margin-top:10px;font-size:.8rem;">${error.message}</p>
+                    </div>`;
+                progressBar.style.width = '0%';
+            }
+        }
+
+        function renderStops(stopDetails) {
+            const content = document.getElementById('content');
+
+            let html = '<div class="stops-list">';
+
+            stopDetails.forEach((stop, index) => {
+                const isTerminus = index === 0 || index === stopDetails.length - 1;
+                const isFuTai = isFuTaiStop(stop.stop);
+
+                const nextETA = stop.etas && stop.etas.length > 0 ? stop.etas[0] : null;
+                const etaInfo = nextETA ? formatETA(nextETA.eta) : null;
+
+                let etaHtml = '';
+                if (etaInfo) {
+                    if (etaInfo.departed) {
+                        etaHtml = `<div class="eta-time departed">Departed</div>`;
+                    } else if (etaInfo.arriving) {
+                        etaHtml = `<div class="eta-time arriving">Arriving</div>`;
+                    } else {
+                        etaHtml = `<div class="eta-time">${etaInfo.text}</div>`;
+                    }
+                    etaHtml += `<div class="eta-label">${formatTime(nextETA.eta)}</div>`;
+                    if (nextETA.rmk_tc || nextETA.rmk_en) {
+                        const remark = nextETA.rmk_tc || nextETA.rmk_en;
+                        etaHtml += `<div class="eta-remark">${remark}</div>`;
+                    }
+                } else {
+                    etaHtml = `<div class="eta-time" style="color:#666;">No ETA</div>`;
+                }
+
+                if (stop.etas && stop.etas.length > 1) {
+                    const secondETA = stop.etas[1];
+                    const secondInfo = formatETA(secondETA.eta);
+                    if (!secondInfo.departed) {
+                        etaHtml += `<div class="eta-label" style="margin-top:4px;">Next: ${secondInfo.text}</div>`;
+                    }
+                }
+
+                let cardClass = 'stop-card';
+                if (isFuTai) cardClass += ' futai';
+                else if (isTerminus) cardClass += ' terminus';
+
+                const badge = isFuTai ? ' ⭐' : '';
+
+                html += `
+                    <div class="${cardClass}">
+                        <div class="stop-number">${stop.seq}</div>
+                        <div class="stop-info">
+                            <div class="stop-name">${stop.name?.name_tc || 'Stop ' + stop.stop}${badge}</div>
+                            <div class="stop-name-en">${stop.name?.name_en || ''}</div>
+                        </div>
+                        <div class="eta-info">
+                            ${etaHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        function setDirection(dir) {
+            currentDirection = dir;
+            document.getElementById('btnOutbound').classList.toggle('active', dir === 'O');
+            document.getElementById('btnInbound').classList.toggle('active', dir === 'I');
+            loadData();
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            refreshTimer = setInterval(loadData, REFRESH_INTERVAL);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            startAutoRefresh();
+        });
+    </script>
+</body>
+</html>
